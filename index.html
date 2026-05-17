@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>理科クイズゲーム</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      body {
+        font-family: 'Noto Sans JP', sans-serif;
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(135deg, #e6f7ff, #f6ffed);
+      }
+      .card {
+        width: min(92vw, 680px);
+        background: #fff;
+        border-radius: 16px;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+        padding: 24px;
+      }
+      h1 {
+        margin-top: 0;
+        font-size: 1.6rem;
+        color: #1f2937;
+      }
+      .meta {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 20px;
+        color: #4b5563;
+        font-weight: 700;
+      }
+      .question {
+        font-size: 1.2rem;
+        font-weight: 700;
+        margin-bottom: 16px;
+        line-height: 1.5;
+      }
+      .choices {
+        display: grid;
+        gap: 10px;
+      }
+      button.choice {
+        padding: 12px;
+        border: 2px solid #bfdbfe;
+        border-radius: 10px;
+        background: #eff6ff;
+        font-size: 1rem;
+        text-align: left;
+        cursor: pointer;
+      }
+      button.choice:hover {
+        background: #dbeafe;
+      }
+      button.choice:disabled {
+        cursor: not-allowed;
+        opacity: 0.9;
+      }
+      .correct {
+        border-color: #10b981 !important;
+        background: #d1fae5 !important;
+      }
+      .wrong {
+        border-color: #ef4444 !important;
+        background: #fee2e2 !important;
+      }
+      .message {
+        min-height: 28px;
+        margin-top: 14px;
+        font-weight: 700;
+      }
+      .next-wrap {
+        margin-top: 10px;
+        display: flex;
+        justify-content: flex-end;
+      }
+      #nextBtn,
+      #restartBtn {
+        padding: 10px 14px;
+        border: none;
+        border-radius: 8px;
+        background: #2563eb;
+        color: #fff;
+        font-size: 0.95rem;
+        cursor: pointer;
+      }
+      #nextBtn:disabled {
+        background: #93c5fd;
+        cursor: not-allowed;
+      }
+      .result {
+        text-align: center;
+      }
+      .coin {
+        font-size: 2rem;
+        margin: 10px 0;
+      }
+      .small {
+        color: #6b7280;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>🌟 理科クイズゲーム（4択 × 10問）</h1>
+      <div id="quizView">
+        <div class="meta">
+          <div id="progress"></div>
+          <div id="score"></div>
+        </div>
+        <div id="question" class="question"></div>
+        <div id="choices" class="choices"></div>
+        <div id="message" class="message"></div>
+        <div class="next-wrap">
+          <button id="nextBtn" disabled>次の問題へ</button>
+        </div>
+      </div>
+
+      <div id="resultView" class="result" style="display: none">
+        <h2>結果発表！</h2>
+        <p id="resultText"></p>
+        <div id="coinText" class="coin"></div>
+        <p class="small">10問の正解数に応じてコインを獲得できます。</p>
+        <button id="restartBtn">もう一度遊ぶ</button>
+      </div>
+    </div>
+
+    <script>
+      const questions = [
+        { q: '植物が光を使ってデンプンなどをつくるはたらきは？', c: ['蒸散', '呼吸', '光合成', '発芽'], a: 2 },
+        { q: '水が0℃で変化する状態は？', c: ['液体→固体', '固体→気体', '気体→液体', '液体→気体'], a: 0 },
+        { q: '地球の大気の中で最も多い気体は？', c: ['酸素', '二酸化炭素', '窒素', 'アルゴン'], a: 2 },
+        { q: 'ヒトの体で血液を全身に送る臓器は？', c: ['肺', '肝臓', '腎臓', '心臓'], a: 3 },
+        { q: 'ばねに力を加えると伸びる長さと力の関係を表す法則は？', c: ['フックの法則', '慣性の法則', '質量保存の法則', 'オームの法則'], a: 0 },
+        { q: '月が地球の周りを1周するのにかかる時間に近いのは？', c: ['約1日', '約7日', '約27日', '約90日'], a: 2 },
+        { q: '食塩を水にとかしたとき、食塩は何と呼ばれる？', c: ['溶媒', '溶質', '沈殿', '気体'], a: 1 },
+        { q: '電流の単位は？', c: ['V（ボルト）', 'A（アンペア）', 'W（ワット）', 'Ω（オーム）'], a: 1 },
+        { q: '火山の噴出物が冷えてできる岩石は？', c: ['堆積岩', '変成岩', '火成岩', '石灰岩'], a: 2 },
+        { q: '音が空気中を伝わる速さはおよそ毎秒どれくらい？', c: ['約34m', '約340m', '約3,400m', '約34,000m'], a: 1 }
+      ];
+
+      let current = 0;
+      let score = 0;
+
+      const progressEl = document.getElementById('progress');
+      const scoreEl = document.getElementById('score');
+      const questionEl = document.getElementById('question');
+      const choicesEl = document.getElementById('choices');
+      const messageEl = document.getElementById('message');
+      const nextBtn = document.getElementById('nextBtn');
+      const quizView = document.getElementById('quizView');
+      const resultView = document.getElementById('resultView');
+      const resultText = document.getElementById('resultText');
+      const coinText = document.getElementById('coinText');
+      const restartBtn = document.getElementById('restartBtn');
+
+      function coinByScore(correctCount) {
+        if (correctCount === 10) return 100;
+        if (correctCount >= 8) return 70;
+        if (correctCount >= 6) return 50;
+        if (correctCount >= 4) return 30;
+        return 10;
+      }
+
+      function renderQuestion() {
+        const item = questions[current];
+        progressEl.textContent = `問題 ${current + 1} / ${questions.length}`;
+        scoreEl.textContent = `正解数: ${score}`;
+        questionEl.textContent = item.q;
+        messageEl.textContent = '';
+        nextBtn.disabled = true;
+        choicesEl.innerHTML = '';
+
+        item.c.forEach((choice, idx) => {
+          const btn = document.createElement('button');
+          btn.className = 'choice';
+          btn.textContent = `${idx + 1}. ${choice}`;
+          btn.addEventListener('click', () => answer(idx));
+          choicesEl.appendChild(btn);
+        });
+      }
+
+      function answer(selected) {
+        const item = questions[current];
+        const buttons = [...document.querySelectorAll('.choice')];
+        buttons.forEach((b) => (b.disabled = true));
+
+        if (selected === item.a) {
+          score++;
+          messageEl.textContent = '✅ 正解！';
+          buttons[selected].classList.add('correct');
+        } else {
+          messageEl.textContent = `❌ 不正解。正解は「${item.c[item.a]}」`;
+          buttons[selected].classList.add('wrong');
+          buttons[item.a].classList.add('correct');
+        }
+
+        scoreEl.textContent = `正解数: ${score}`;
+        nextBtn.disabled = false;
+      }
+
+      function showResult() {
+        const coin = coinByScore(score);
+        quizView.style.display = 'none';
+        resultView.style.display = 'block';
+        resultText.textContent = `あなたは 10問中 ${score}問 正解でした！`;
+        coinText.textContent = `🪙 獲得コイン: ${coin} コイン`;
+      }
+
+      nextBtn.addEventListener('click', () => {
+        current++;
+        if (current < questions.length) {
+          renderQuestion();
+        } else {
+          showResult();
+        }
+      });
+
+      restartBtn.addEventListener('click', () => {
+        current = 0;
+        score = 0;
+        quizView.style.display = 'block';
+        resultView.style.display = 'none';
+        renderQuestion();
+      });
+
+      renderQuestion();
+    </script>
+  </body>
+</html>
